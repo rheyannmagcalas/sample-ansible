@@ -1,0 +1,126 @@
+---
+- hosts: test-servers
+
+  tasks:
+#--------installing streamset requirements---------------------------#
+  - name: install java 1.8
+    yum:
+      name: java-1.8.0-openjdk
+      state: present
+
+  - name: updating ulimit soft nofile
+    pam_limits:
+      domain: root
+      limit_type: soft
+      limit_item: nofile
+      value: 65535
+
+  - name: updating ulimit hard nofile
+    pam_limits:
+      domain: root
+      limit_type: hard
+      limit_item: nofile
+      value: 65535
+
+  - name: updating ulimit soft nproc
+    pam_limits:
+      domain: root
+      limit_type: soft
+      limit_item: nproc
+      value: 65535
+
+  - name: updating ulimit hard nproc
+    pam_limits:
+      domain: root
+      limit_type: hard
+      limit_item: nproc
+      value: 65535
+
+  - name: Creates directory
+    file:
+      path: /vagrant/ansible 
+      state: directory
+      owner: root
+      group: root
+      mode: 0775
+
+#-----------installing and starting streamset library---------------------------#
+  - name: exporting streamset tar file
+    unarchive:
+      src: streamsets-datacollector-3.3.1-el7-all-rpms.tar
+      dest: /vagrant/ansible/
+
+  - name: Finding RPM files
+    find:
+      paths: "/vagrant/ansible/streamsets-datacollector-3.3.1-el7-all-rpms"
+      patterns: "*.rpm"
+    register: rpm_result
+
+  - name: Install RPM
+    yum:
+      name: "{{ item.path }}"
+      state: present
+    with_items: "{{ rpm_result.files }}"
+
+  - name: Start service sdc, if not running
+    service:
+      name: sdc
+      state: started
+
+  - name: upgrade all packages
+    yum: name=* state=latest
+
+#-----------installing python3.4--------------------------------------------------#
+  - name: install epel-release
+    yum:
+      name: epel-release
+      state: latest
+
+  - name: installing python3.4 packages
+    yum: name={{ item }} state=present update_cache=yes
+    with_items:
+        - gcc
+        - python34-setuptools
+        - python34
+        - python-pip
+        - python-virtualenv
+        - python34-pip
+        - python34-devel
+        - python34-devel
+        - git-all
+        - htop
+        - git
+
+#-----------installing python streamset--------------------------------------------#
+  - name: Install Streamsets
+    shell: pip3 install streamsets
+
+  - name: fixing streamsets library error
+    copy:
+      src: sdc_models.py
+      dest: /usr/lib64/python3.4/site-packages/streamsets/sdk/sdc_models.py
+      owner: root
+      group: root
+      mode: 0644
+
+#-----------installing sample pipeline creation script-------------------------------#
+  - name: Create streamset activation directory
+    file:
+      path: /root/.streamsets/activation/
+      state: directory
+      owner: root
+      group: root
+      mode: 0775
+
+  - name: Pull Code from Git
+    git:
+      repo: git@git.ringcentral.com:rhey.magcalas/ansible.git
+      dest: /vagrant/src 
+      version: master
+      force: yes
+
+  - name: Streamset RSA
+    command: mv /vagrant/src/rsa-signed-activation-info.properties /root/.streamsets/activation
+
+  - name: Run Create Pipeline Script
+    shell: python3 /vagrant/src/test_create_pipeline.py
