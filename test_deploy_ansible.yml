@@ -102,25 +102,3 @@
       owner: root
       group: root
       mode: 0644
-
-#-----------installing sample pipeline creation script-------------------------------#
-  - name: Create streamset activation directory
-    file:
-      path: /root/.streamsets/activation/
-      state: directory
-      owner: root
-      group: root
-      mode: 0775
-
-  - name: Pull Code from Git
-    git:
-      repo: git@git.ringcentral.com:rhey.magcalas/ansible.git
-      dest: /vagrant/src 
-      version: master
-      force: yes
-
-  - name: Streamset RSA
-    command: mv /vagrant/src/rsa-signed-activation-info.properties /root/.streamsets/activation
-
-  - name: Run Create Pipeline Script
-    shell: python3 /vagrant/src/test_create_pipeline.py
